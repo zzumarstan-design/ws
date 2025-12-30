@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Тест: Анализ личности</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --primary: #4f46e5;
+            --bg: #f3f4f6;
+            --dark: #1f2937;
+            --card: #ffffff;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg);
+            color: var(--dark);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+        }
+
+        .container {
+            background: var(--card);
+            padding: 30px;
+            border-radius: 20px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            width: 90%;
+            max-width: 450px;
+            text-align: center;
+            position: relative;
+        }
+
+        h1 { font-size: 24px; margin-bottom: 10px; }
+        p { color: #6b7280; font-size: 14px; margin-bottom: 20px; }
+
+        input {
+            width: 100%;
+            padding: 12px;
+            margin: 8px 0;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            box-sizing: border-box;
+        }
+
+        button {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 14px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 10px;
+        }
+
+        .option-btn {
+            background: #ffffff;
+            color: var(--dark);
+            border: 1.5px solid #e5e7eb;
+            text-align: left;
+            margin-bottom: 10px;
+            font-weight: 400;
+        }
+
+        .option-btn:hover { border-color: var(--primary); background: #f8fafc; }
+
+        .back-btn {
+            background: none;
+            color: #9ca3af;
+            font-size: 13px;
+            text-decoration: underline;
+            width: auto;
+            margin-top: 15px;
+            cursor: pointer;
+            font-weight: 400;
+        }
+
+        .progress-bar {
+            height: 4px;
+            background: #e5e7eb;
+            border-radius: 2px;
+            margin-bottom: 20px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: var(--primary);
+            width: 0%;
+            transition: 0.3s;
+        }
+
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+
+    <div id="screen-start" class="container">
+        <h1>Анализ личности</h1>
+        <p>Создатель: <b>Жансерк</b>. Пройди тест из 25 вопросов.</p>
+        <input type="text" id="userName" placeholder="Твое имя">
+        <input type="number" id="userAge" placeholder="Твой возраст">
+        <button onclick="startQuiz()">Начать опрос</button>
+    </div>
+
+    <div id="screen-quiz" class="container hidden">
+        <div class="progress-bar"><div class="progress-fill" id="progress"></div></div>
+        <p id="q-number" style="margin-bottom: 5px; font-weight: bold;"></p>
+        <h3 id="question-text" style="margin-top: 0; min-height: 50px;"></h3>
+        <div id="options"></div>
+        <button id="btn-back" class="back-btn" onclick="goBack()">← Вернуться назад</button>
+    </div>
+
+    <div id="screen-result" class="container hidden">
+        <h1>Результат: <span id="res-name"></span></h1>
+        <p id="res-desc" style="font-size: 18px; color: var(--dark);"></p>
+        <canvas id="myChart"></canvas>
+        <button onclick="location.reload()" style="background: #6b7280; margin-top: 20px;">Пройти заново</button>
+    </div>
+
+    <script>
+        // ВСТАВЬ СВОЮ ССЫЛКУ ИЗ GOOGLE SCRIPTS СЮДА
+        const SCRIPT_URL = "ЗДЕСЬ_ТВОЯ_ССЫЛКА_ОТ_GOOGLE_ТАБЛИЦЫ";
+
+        const questions = [
+            {q: "Как ты проводишь свободный вечер?", a: "Дома в тишине", b: "В гостях у друга", c: "На шумном мероприятии", w: [1,2,3]},
+            {q: "Твое отношение к новым знакомствам?", a: "Избегаю их", b: "По настроению", c: "Обожаю заводить друзей", w: [1,2,3]},
+            {q: "Как ты восстанавливаешь силы?", a: "В одиночестве", b: "За просмотром кино", c: "В компании людей", w: [1,2,3]},
+            {q: "Твой телефон зазвонил (незнакомый номер):", a: "Не возьму трубку", b: "Подожду, пока перестанет", c: "Сразу отвечу", w: [1,2,3]},
+            {q: "В компании ты больше...", a: "Слушаешь", b: "Поддерживаешь диалог", c: "Рассказываешь истории", w: [1,2,3]},
+            {q: "Работа в команде для тебя это:", a: "Стресс", b: "Необходимость", c: "Удовольствие", w: [1,2,3]},
+            {q: "Сначала говоришь, потом думаешь?", a: "Никогда", b: "Редко", c: "Постоянно", w: [1,2,3]},
+            {q: "Как ты ведешь себя в новом коллективе?", a: "Присматриваюсь", b: "Общаюсь по делу", c: "Сразу становлюсь своим", w: [1,2,3]},
+            {q: "Любишь ли ты быть в центре внимания?", a: "Терпеть не могу", b: "Если есть повод", c: "Очень люблю", w: [1,2,3]},
+            {q: "Твой идеальный отпуск:", a: "Глухая деревня", b: "Экскурсии по городам", c: "Активный курорт", w: [1,2,3]},
+            {q: "Как ты реагируешь на спонтанные идеи?", a: "Отрицательно", b: "Нужно подумать", c: "Я только за!", w: [1,2,3]},
+            {q: "Часто ли ты пишешь первым в соцсетях?", a: "Почти никогда", b: "Иногда", c: "Постоянно", w: [1,2,3]},
+            {q: "Как ты принимаешь решения?", a: "Долго и сам", b: "Советуюсь с парой людей", c: "Обсуждаю со всеми", w: [1,2,3]},
+            {q: "Что тебя больше пугает?", a: "Публичное выступление", b: "Ссора с близким", c: "Одинокие выходные", w: [3,2,1]},
+            {q: "Можешь ли ты заговорить с прохожим?", a: "Нет", b: "Если нужно спросить дорогу", c: "Да, легко", w: [1,2,3]},
+            {q: "Твое отношение к конфликтам:", a: "Ухожу от них", b: "Ищу компромисс", c: "Иду в атаку", w: [1,2,3]},
+            {q: "Легко ли тебе выражать эмоции?", a: "Всё держу в себе", b: "Только близким", c: "Я как открытая книга", w: [1,2,3]},
+            {q: "Как ты ведешь себя на вечеринке?", a: "Сижу в углу с телефоном", b: "Общаюсь с парой человек", c: "Танцую и знакомлюсь", w: [1,2,3]},
+            {q: "Твое мнение о больших компаниях?", a: "Они меня истощают", b: "Нормально на пару часов", c: "Они меня вдохновляют", w: [1,2,3]},
+            {q: "Ты любишь планировать жизнь?", a: "Всё по полочкам", b: "Примерный план", c: "Живу моментом", w: [1,2,3]},
+            {q: "Твоя реакция на критику:", a: "Сильно расстраиваюсь", b: "Анализирую", c: "Спорю в ответ", w: [1,2,3]},
+            {q: "Считают ли тебя окружающие активным?", a: "Нет, скорее тихим", b: "Спокойным", c: "Душой компании", w: [1,2,3]},
+            {q: "Легко ли ты меняешь свое мнение?", a: "Нет, я принципиален", b: "Если есть факты", c: "Да, под влиянием других", w: [1,2,3]},
+            {q: "Как часто тебе скучно одному?", a: "Никогда", b: "Редко", c: "Постоянно", w: [1,2,3]},
+            {q: "Твой главный девиз:", a: "Мой дом - моя крепость", b: "Всё хорошо в меру", c: "Жизнь - это движение", w: [1,2,3]}
+        ];
+
+        let step = 0;
+        let scoreHistory = [];
+
+        function startQuiz() {
+            const name = document.getElementById('userName').value;
+            if(!name) return alert("Введи имя!");
+            document.getElementById('screen-start').classList.add('hidden');
+            document.getElementById('screen-quiz').classList.remove('hidden');
+            showQ();
+        }
+
+        function showQ() {
+            const q = questions[step];
+            document.getElementById('progress').style.width = ((step + 1) / questions.length * 100) + "%";
+            document.getElementById('q-number').innerText = `Вопрос ${step + 1} из 25`;
+            document.getElementById('question-text').innerText = q.q;
+            
+            const opt = document.getElementById('options');
+            opt.innerHTML = '';
+
+            [q.a, q.b, q.c].forEach((t, i) => {
+                const b = document.createElement('button');
+                b.className = 'option-btn';
+                b.innerText = t;
+                b.onclick = () => selectOption(q.w[i]);
+                opt.appendChild(b);
+            });
+
+            document.getElementById('btn-back').innerText = (step === 0) ? "← Изменить данные" : "← Вернуться назад";
+        }
+
+        function selectOption(weight) {
+            scoreHistory.push(weight);
+            step++;
+            if(step < questions.length) {
+                showQ();
+            } else {
+                finish();
+            }
+        }
+
+        function goBack() {
+            if(step === 0) {
+                document.getElementById('screen-quiz').classList.add('hidden');
+                document.getElementById('screen-start').classList.remove('hidden');
+            } else {
+                step--;
+                scoreHistory.pop();
+                showQ();
+            }
+        }
+
+        function finish() {
+            const name = document.getElementById('userName').value;
+            const age = document.getElementById('userAge').value;
+            const totalScore = scoreHistory.reduce((a, b) => a + b, 0);
+            const avg = totalScore / questions.length;
+            
+            let resTitle = "";
+            let resDesc = "";
+            let chartData = [];
+
+            if(avg < 1.6) {
+                resTitle = "Интроверт";
+                resDesc = "Ты Интроверт. типа нетакуся";
+                chartData = [85, 10, 5];
+            } else if(avg < 2.4) {
+                resTitle = "Амбиверт";
+                resDesc = "Ты Амбиверт. На двух стульях сидишь.";
+                chartData = [25, 60, 15];
+            } else {
+                resTitle = "Экстраверт";
+                resDesc = "Ты Экстраверт. даубаеб";
+                chartData = [5, 15, 80];
+            }
+
+            // ОТПРАВКА ДАННЫХ В ТАБЛИЦУ
+            if(SCRIPT_URL.startsWith("http")) {
+                fetch(SCRIPT_URL, {
+                    method: "POST",
+                    mode: "no-cors",
+                    body: JSON.stringify({
+                        name: name,
+                        age: age,
+                        result: resTitle
+                    })
+                });
+            }
+
+            document.getElementById('screen-quiz').classList.add('hidden');
+            document.getElementById('screen-result').classList.remove('hidden');
+            document.getElementById('res-name').innerText = name;
+            document.getElementById('res-desc').innerText = resDesc;
+
+            new Chart(document.getElementById('myChart'), {
+                type: 'bar',
+                data: {
+                    labels: ['Интроверсия', 'Амбиверсия', 'Экстраверсия'],
+                    datasets: [{
+                        label: '% Совпадения',
+                        data: chartData,
+                        backgroundColor: ['#4f46e5', '#818cf8', '#c7d2fe'],
+                        borderRadius: 5
+                    }]
+                },
+                options: { scales: { y: { beginAtZero: true, max: 100 } } }
+            });
+        }
+    </script>
+</body>
+</html>
